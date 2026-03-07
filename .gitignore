@@ -5,5 +5,8 @@
 !.claude/
 !.claude/**
 
+# But exclude local settings (contains sensitive/personal data)
+.claude/settings.local.json
+
 # And .gitignore itself
 !.gitignore
