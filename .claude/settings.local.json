@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "mcp__puppeteer__puppeteer_navigate",
+      "mcp__browsermcp__browser_navigate",
+      "Bash(pdftotext \"/Users/chenkai/Documents/Personal/claude-test/Extend Claude with skills - Claude Code Docs.pdf\" - 2>/dev/null | head -200)",
+      "Bash(python3 .claude/skills/skill-create/validate_skill.py yuque-doc-downloader)",
+      "mcp__yuque-mcp__yuque_get_doc",
+      "mcp__puppeteer__puppeteer_evaluate",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(pdftotext \"/Users/chenkai/Documents/Personal/claude-test/kongshengnan.pdf\" - 2>/dev/null || pdf2txt.py \"/Users/chenkai/Documents/Personal/claude-test/kongshengnan.pdf\" 2>/dev/null || python3 -c \"\nimport fitz  # PyMuPDF\ndoc = fitz.open\\('/Users/chenkai/Documents/Personal/claude-test/kongshengnan.pdf'\\)\ntext = ''\nfor page in doc:\n    text += page.get_text\\(\\)\nprint\\(text\\)\n\" 2>/dev/null || echo \"无法提取PDF文本\")",
+      "Bash(python3 << 'EOF'\ntry:\n    import fitz  # PyMuPDF\n    doc = fitz.open\\('/Users/chenkai/Documents/Personal/claude-test/kongshengnan.pdf'\\)\n    text = ''\n    for i, page in enumerate\\(doc\\):\n        text += f\"\\\\n--- Page {i+1} ---\\\\n\"\n        text += page.get_text\\(\\)\n    print\\(text\\)\nexcept Exception as e:\n    print\\(f\"PyMuPDF error: {e}\"\\)\n    try:\n        import pdfplumber\n        text = ''\n        with pdfplumber.open\\('/Users/chenkai/Documents/Personal/claude-test/kongshengnan.pdf'\\) as pdf:\n            for i, page in enumerate\\(pdf.pages\\):\n                text += f\"\\\\n--- Page {i+1} ---\\\\n\"\n                text += page.extract_text\\(\\) or \"\"\n        print\\(text\\)\n    except Exception as e2:\n        print\\(f\"pdfplumber error: {e2}\"\\)\nEOF)",
+      "Bash(which gitp && gitp --help 2>/dev/null || echo \"gitp not found or no help available\")",
+      "Bash(gitp)",
+      "Bash(git init)",
+      "Bash(git remote add origin git@github.com:wxxlamp/ai-coding-config.git)",
+      "Bash(git pull origin main 2>&1 || git pull origin master 2>&1)",
+      "Bash(git add .gitignore .claude/)"
+    ]
+  }
+}

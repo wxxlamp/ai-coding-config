@@ -1,0 +1,9 @@
+# Ignore everything
+*
+
+# Except .claude folder
+!.claude/
+!.claude/**
+
+# And .gitignore itself
+!.gitignore
