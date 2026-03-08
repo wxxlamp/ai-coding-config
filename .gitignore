@@ -11,3 +11,5 @@
 
 # And .gitignore itself
 !.gitignore
+!README.md
+!LICENSE
