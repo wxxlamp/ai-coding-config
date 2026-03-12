@@ -47,3 +47,20 @@ cp -r .claude /path/to/your/project/
 ## License
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
+
+
+## Recent Changes (Updated: 2026-03-08 21:50:24)
+
+### Diff with main Branch:
+```
+ .claude/skills/yuque-doc-downloader/SKILL.md      | 168 ----------------------
+ .claude/skills/yuque-doc-downloader/html-to-md.js | 112 ---------------
+ README.md                                         |  13 ++
+ 3 files changed, 13 insertions(+), 280 deletions(-)
+```
+
+### Last Commit Details:
+Date: 2026-03-08 20:55:14 +0800
+Author: wxx <wxxlamp@foxmail.com>
+Commit: 6286582
+Message: update the gitignore file
