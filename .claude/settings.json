@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/regenerate-readme.sh"
+            "command": ".claude/hooks/session-end/regenerate-readme.sh"
           }
         ]
       }
