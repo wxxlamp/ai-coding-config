@@ -1,66 +1,67 @@
 # AI Coding Config
 
-个人 AI 编程工具的配置文件集合，主要用于 [Claude Code](https://claude.ai/code) 等 AI 辅助编程工具。
+Claude Code 配置与技能集合，用于提升 AI 辅助编程效率。
 
-## 包含内容
+## 目录结构
 
-### 1. Claude Code 配置 (`.claude/`)
+```
+.claude/
+├── settings.json          # 全局配置与 hooks
+├── settings.local.json    # 本地个人配置（未纳入版本控制）
+├── hooks/                 # Claude Code 钩子脚本
+│   └── session-end/
+│       └── regeneration-readme.sh  # 提交后自动更新 README
+└── skills/                # 技能集合
+    ├── skill-creator/     # 官方技能创建与评估工具
+    ├── img-uploader/      # 图片上传工具
+    └── skill-create/      # 技能创建模板（基础版）
+```
 
-- **`settings.local.json`** - Claude Code 本地配置文件（包含个人设置，已排除在版本控制外）
-- **`skills/`** - 自定义技能集合
-  - `skill-create` - 创建新技能的工具和模板
-  - `yuque-doc-downloader` - 语雀文档下载工具
+## 技能说明
+
+| 技能 | 用途 |
+|------|------|
+| `skill-creator` | 创建、优化、评估技能性能的完整工具链 |
+| `img-uploader` | 上传图片到图床（支持 Imgur、sm.ms、GitHub + jsDelivr） |
+| `skill-create` | 快速创建新技能的基础模板 |
 
 ## 使用方法
 
-### 克隆到本地
+### 1. 克隆配置
 
 ```bash
 git clone git@github.com:wxxlamp/ai-coding-config.git
+cd ai-coding-config
 ```
 
-### 配合 Claude Code 使用
+### 2. 应用到项目
 
-将 `.claude/` 目录复制到你的项目根目录，Claude Code 会自动加载其中的配置和技能。
+将 `.claude/` 目录复制到目标项目：
 
 ```bash
 cp -r .claude /path/to/your/project/
 ```
 
-### 添加个人配置
+### 3. 添加本地配置
 
-在项目目录下创建 `.claude/settings.local.json` 来覆盖默认设置：
+创建 `.claude/settings.local.json` 存放个人敏感信息：
 
 ```json
 {
   "project": {
-    "name": "你的项目名称"
+    "name": "your-project-name"
   }
 }
 ```
 
-## 注意事项
+> `settings.local.json` 已加入 `.gitignore`，不会提交到仓库。
 
-- `settings.local.json` 包含个人敏感信息，已添加到 `.gitignore`，不会提交到仓库
-- 每个项目的具体配置请在本地单独维护
+## Hooks 说明
+
+- **PreToolUse:Bash** - 执行 Bash 命令前触发，用于自动化任务
+- **Notification** - Claude Code 需要用户注意时触发系统通知
+- **PostCommit** - Git 提交后自动执行（通过 `session-end` 模拟）
 
 ## License
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
-
-
-## Recent Changes (Updated: 2026-03-08 21:50:24)
-
-### Diff with main Branch:
-```
- .claude/skills/yuque-doc-downloader/SKILL.md      | 168 ----------------------
- .claude/skills/yuque-doc-downloader/html-to-md.js | 112 ---------------
- README.md                                         |  13 ++
- 3 files changed, 13 insertions(+), 280 deletions(-)
-```
-
-### Last Commit Details:
-Date: 2026-03-08 20:55:14 +0800
-Author: wxx <wxxlamp@foxmail.com>
-Commit: 6286582
-Message: update the gitignore file
