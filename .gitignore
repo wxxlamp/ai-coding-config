@@ -5,6 +5,13 @@
 !.claude/
 !.claude/**
 
+# Codex plugin source
+!plugins/
+!plugins/yuque-multichannel-publisher/
+!plugins/yuque-multichannel-publisher/**
+plugins/**/__pycache__/
+plugins/**/*.py[cod]
+
 # But exclude local settings (contains sensitive/personal data)
 .claude/settings.local.json
 .claude/**/config.json
