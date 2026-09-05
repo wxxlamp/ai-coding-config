@@ -215,3 +215,8 @@ content-projects/<slug>/
 `series-plan.json` 还需 `content_units: [{"id":"u1","source_excerpt":"成稿中的实际短片段"}]`；每个 round 添加 `unit_ids: ["u1"]`、`split_reason`、`standalone_test`、`overlap_review` 字符串。未分配材料需在 unit 添加 `excluded_reason`。不允许各轮复用完全相同材料；少量必要背景重叠由 AI 说明，不能靠改写标题伪装独立。
 
 `section_images` 只记录实际选用的生成章节图，增加 `placement_reason`；URL 应位于相应章节，不要求前 3 行。原始材料仍按原意保留。微信预览存在 `draft/preview/`，项目内保留证据，不当作发布正文。
+
+
+## 平台标题与可选英文版
+
+新项目还必须遵守 [publishing-plan.md](publishing-plan.md)。发布计划单独记录专业博客标题、吸引读者的社交标题、规范分类话题和 AI 英文取舍理由。英文正文与英文图片实际复审后才可分发；editorial-review 的 artifacts 同时绑定 publishing-plan.json 与可选 english.md，内容变化后重新复审。

@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from editorial_quality import validate_editorial, validate_series_evidence, without_fences
+from publishing_policy import catalog_context, load_plan, title_for, english_enabled, validate_plan
 
 from workspace import DEFAULT_CONFIG, configured_path, config_path, find_workspace_root, load_config, posts_dir, state_dir
 
@@ -286,6 +287,7 @@ def command_init(args: argparse.Namespace) -> None:
         "rednote_images": {},
         "ai_tone_review": {},
         "editorial_contract_version": 2,
+        "publishing_contract_version": 1,
         "section_image_policy": "content-driven",
         "created_at": created,
     }
@@ -493,6 +495,8 @@ def command_upload_image(args: argparse.Namespace) -> None:
         image = (repo / image).resolve()
     if not image.is_file():
         raise SystemExit(f"图片不存在：{image}")
+    if getattr(args, "language", "zh") == "en" and args.kind not in ("cover", "section"):
+        raise SystemExit("英文图片只支持博客 cover / section，避免覆盖社交平台图片")
     configured_cover_ratio = str(metadata.get("cover_ratio") or "21:9")
     configured_wechat_cover_ratio = str(metadata.get("wechat_cover_ratio") or "2.35:1")
     dimensions = require_image_ratio(image, args.kind, configured_cover_ratio, configured_wechat_cover_ratio)
@@ -511,7 +515,11 @@ def command_upload_image(args: argparse.Namespace) -> None:
         record["width"], record["height"] = dimensions
     if args.style:
         record["style"] = args.style
-    if args.kind == "cover":
+    if getattr(args, "language", "zh") == "en":
+        record["ratio"] = configured_cover_ratio if args.kind == "cover" else "16:9"
+        record["language"] = "en"
+        metadata.setdefault("english_images", {})[args.key] = record
+    elif args.kind == "cover":
         record["ratio"] = configured_cover_ratio
         record.setdefault("style", str(metadata.get("lead_image_style") or "ghibli-inspired"))
         metadata["cover_image"] = record
@@ -816,6 +824,8 @@ def validate_draft(project: Path, metadata: dict[str, Any]) -> tuple[list[str], 
         errors.extend(validate_editorial(project, metadata, channels))
     else:
         warnings.append("旧项目尚未启用编辑契约 v2；继续加工时按 editorial-review.md 升级")
+    if metadata.get("publishing_contract_version") == 1:
+        errors.extend(validate_plan(project, metadata, find_workspace_root(project)))
     return errors, warnings
 
 
@@ -823,6 +833,7 @@ def expected_outputs(repo: Path, slug: str) -> dict[str, Path]:
     config = load_config(repo)
     return {
         "blog": posts_dir(repo, config) / f"{slug}.md",
+        "blog_en": posts_dir(repo, config) / "en" / f"{slug}.md",
         "wechat_markdown": configured_path(repo, config, "wechat_dir") / slug / "article.md",
         "wechat_html": configured_path(repo, config, "wechat_dir") / slug / "article.html",
         "rednote_root": configured_path(repo, config, "rednote_dir") / slug,
@@ -837,6 +848,7 @@ def validate_materialized(repo: Path, slug: str, metadata: dict[str, Any]) -> tu
     required = []
     if "blog" in channels:
         required.append("blog")
+        if english_enabled(project_dir(repo, slug), metadata): required.append("blog_en")
     if "wechat" in channels:
         required.extend(("wechat_markdown", "wechat_html"))
     for name in required:
@@ -864,6 +876,10 @@ def validate_materialized(repo: Path, slug: str, metadata: dict[str, Any]) -> tu
         pairs = []
         if "blog" in channels:
             pairs.append((project/"draft/polished.md", outputs["blog"], True))
+            if english_enabled(project, metadata):
+                pairs.append((project/"draft/english.md", outputs["blog_en"], True))
+            elif metadata.get("publishing_contract_version") == 1 and outputs["blog_en"].exists():
+                errors.append("英文版已跳过但最终目录存在旧译稿，请先明确归档旧稿")
         if "wechat" in channels:
             pairs += [(project/"draft/wechat.md", outputs["wechat_markdown"], True),
                       (project/"draft/wechat.html", outputs["wechat_html"], False)]
@@ -1277,7 +1293,7 @@ def command_send_draft(args: argparse.Namespace) -> None:
             body = outputs["wechat_markdown"].read_text(encoding="utf-8")
             source.write_text(
                 "---\n"
-                f"title: {yaml_string(str(metadata.get('title', '')).strip())}\n"
+                f"title: {yaml_string(title_for(project, metadata, 'wechat'))}\n"
                 f"description: {yaml_string(str(metadata.get('description', '')).strip())}\n"
                 "---\n\n" + body,
                 encoding="utf-8",
@@ -1310,7 +1326,7 @@ def command_send_draft(args: argparse.Namespace) -> None:
                 html=html,
             )
             article: dict[str, Any] = {
-                "title": str(metadata.get("title") or "").strip(),
+                "title": title_for(project, metadata, "wechat"),
                 "digest": str(metadata.get("description") or "").strip(),
                 "content": content,
                 "thumb_media_id": cover_material["media_id"],
@@ -1437,11 +1453,12 @@ def command_materialize(args: argparse.Namespace) -> None:
         raise SystemExit("必须先完成 AI review，并记录 reviewed 检查点后才能分发")
     channels = selected_channels(metadata)
     polished = strip_front_matter((project / "draft" / "polished.md").read_text(encoding="utf-8"))
-    title = str(metadata.get("title", "")).strip()
+    plan = load_plan(project)
+    title = title_for(project, metadata, "blog")
     description = str(metadata.get("description", "")).strip()
     date_value = metadata.get("date") or dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    tags = metadata.get("tags") or ["未分类"]
-    categories = metadata.get("categories") or ["技术随笔"]
+    tags = plan.get("taxonomy", {}).get("topics") or metadata.get("tags") or ["未分类"]
+    categories = plan.get("taxonomy", {}).get("categories") or metadata.get("categories") or ["技术随笔"]
     front_matter = [
         "---",
         f"title: {yaml_string(title)}",
@@ -1455,9 +1472,21 @@ def command_materialize(args: argparse.Namespace) -> None:
         "",
     ]
     outputs = expected_outputs(repo, args.project)
+    if "blog" in channels and metadata.get("publishing_contract_version") == 1 and not english_enabled(project, metadata) and outputs["blog_en"].exists():
+        raise SystemExit("已跳过英文版，但最终目录存在旧英文稿；先明确处理旧稿，再分发")
     if "blog" in channels:
         outputs["blog"].parent.mkdir(parents=True, exist_ok=True)
         outputs["blog"].write_text("\n".join(front_matter) + polished.rstrip() + "\n", encoding="utf-8")
+        if english_enabled(project, metadata):
+            english = plan["english"]
+            english_header = list(front_matter)
+            english_header[1] = f"title: {yaml_string(english['title'])}"
+            english_header[-3] = f"description: {yaml_string(english['description'])}"
+            english_header[-2:-2] = ["lang: en", f"translation_of: {yaml_string(args.project)}"]
+            translated = strip_front_matter((project/"draft/english.md").read_text())
+            outputs["blog_en"].parent.mkdir(parents=True, exist_ok=True)
+            outputs["blog_en"].write_text("\n".join(english_header) + translated.rstrip() + "\n")
+
     if "wechat" in channels:
         wechat_source = strip_front_matter((project / "draft" / "wechat.md").read_text(encoding="utf-8"))
         wechat_html = (project / "draft" / "wechat.html").read_text(encoding="utf-8")
@@ -1481,6 +1510,7 @@ def command_materialize(args: argparse.Namespace) -> None:
     artifact_keys = []
     if "blog" in channels:
         artifact_keys.append("blog")
+        if english_enabled(project, metadata): artifact_keys.append("blog_en")
     if "wechat" in channels:
         artifact_keys.extend(("wechat_markdown", "wechat_html"))
     for key in artifact_keys:
@@ -1497,9 +1527,23 @@ def command_materialize(args: argparse.Namespace) -> None:
     print(json.dumps(output_records, ensure_ascii=False, indent=2))
 
 
+def command_publishing_context(args: argparse.Namespace) -> None:
+    repo = find_workspace_root()
+    project, _, _ = load_project(repo, args.project)
+    result = catalog_context(repo)
+    source = project / "draft/polished.md"
+    result["source_sha256"] = file_digest(source) if source.is_file() else None
+    result["plan_path"] = str(project / "draft/publishing-plan.json")
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="可恢复的语雀多平台内容流水线")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    context = subparsers.add_parser("publishing-context", help="读取当前分类话题目录及稿件指纹，供 AI 做发布决策")
+    context.add_argument("--project", required=True)
+    context.set_defaults(handler=command_publishing_context)
 
     setup = subparsers.add_parser("setup", help="初始化工作区本地配置")
     setup.add_argument("--posts-dir")
@@ -1567,6 +1611,7 @@ def build_parser() -> argparse.ArgumentParser:
     upload.add_argument("--key", required=True)
     upload.add_argument("--file", required=True)
     upload.add_argument("--style")
+    upload.add_argument("--language", choices=("zh", "en"), default="zh")
     upload.add_argument("--provider", choices=("imgur", "smms", "github", "chevereto"))
     upload.set_defaults(handler=command_upload_image)
 

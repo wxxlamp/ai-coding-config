@@ -109,3 +109,6 @@ GitHub 图床还支持：
 - 语雀 `storage_state.json`
 
 接收者在自己的工作区执行 `setup`，首次使用相关分类时由 AI 建立自己的语气档案。
+
+
+`taxonomy_catalog` 默认 `source/_data/taxonomy.json`，与工作区相对，提供 canonical 中文分类/话题及英文显示名。未提供目录时从中文文章元数据读取已有名称；参见 [publishing-plan.md](publishing-plan.md)。

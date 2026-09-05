@@ -67,3 +67,8 @@
 ```
 
 从预览脚本生成的 layout-evidence.json 复制 previews，然后实际查看图片再填 status 与 notes。润色、换图、改卡片后文件指纹变化会使复审失效；更新相关观察再计算新指纹，不能仅重新填哈希。
+
+
+## 平台标题与可选英文版
+
+新项目还必须遵守 [publishing-plan.md](publishing-plan.md)。发布计划单独记录专业博客标题、吸引读者的社交标题、规范分类话题和 AI 英文取舍理由。英文正文与英文图片实际复审后才可分发；editorial-review 的 artifacts 同时绑定 publishing-plan.json 与可选 english.md，内容变化后重新复审。

@@ -96,3 +96,10 @@ codex plugin add yuque-multichannel-publisher@<marketplace-name>
 微信提供 `wechat_layout.py` 的 ink/warm 两种行内样式，以及 `wechat_preview.py` 的 375px/430px 预览。默认取消每个标题后强制配图。知识核查与审美判断仍由 AI 实际完成，脚本只检查结构、保真和复审是否过期，不把形式检查冒充内容质量保证。
 
 升级后在使用的 Python 环境安装 Skill 的 requirements.txt。新建项目自动启用 v2；旧项目按 references/editorial-review.md 迁移，原有产物和投递记录保留。
+
+
+## 标题、分类和英文版
+
+博客使用专业清晰的独立标题，公众号、小红书按真实读者收益选择更有吸引力的标题。新项目通过 `publishing-context` 读取当前博客分类话题目录，由 AI 根据专业深度决定英文版；面试与零散备忘通常跳过。选中的文章完整翻译并生成英文配图，写入 `source/_posts/en/`，保留双语对应关系。
+
+发布决策和英文稿纳入 SHA-256 复审，阻止未知标签、未审阅英文图片和修改后未复核的材料进入成品。旧项目保持兼容；详见 [发布计划契约](skills/yuque-multichannel-publisher/references/publishing-plan.md)。

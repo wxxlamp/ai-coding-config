@@ -142,6 +142,11 @@ def required_artifacts(project, channels):
         paths += ['draft/rednote/series-plan.json']
         for p in sorted((project/'draft/rednote').glob('round*/post.md')):
             paths += [p.relative_to(project).as_posix(), (p.parent/'cards.json').relative_to(project).as_posix()]
+    if (project/'draft/publishing-plan.json').is_file():
+        paths.append('draft/publishing-plan.json')
+        english = load_object(project/'draft/publishing-plan.json').get('english', {})
+        if 'blog' in channels and isinstance(english, dict) and english.get('decision') == 'generate':
+            paths.append('draft/english.md')
     return paths
 
 
@@ -170,6 +175,8 @@ def validate_editorial(project, metadata, channels):
     targets = ['polished'] + (['wechat'] if 'wechat' in channels else [])
     if 'rednote' in channels:
         targets += [p.parent.name for p in (project/'draft/rednote').glob('round*/post.md')]
+    if 'draft/english.md' in required_artifacts(project, channels):
+        targets.append('english')
     for target in targets:
         review = reviews.get(target, {})
         if not isinstance(review, dict):

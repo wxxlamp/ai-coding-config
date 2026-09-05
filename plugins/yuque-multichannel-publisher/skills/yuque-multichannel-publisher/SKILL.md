@@ -116,6 +116,10 @@ python3 plugins/yuque-multichannel-publisher/skills/yuque-multichannel-publisher
 
 两种编辑模式都必须执行由 AI 完成的“去 AI 味”复审；`polish-expand` 扩写结束后再做一遍：删除模板化时代开场、空泛黑话、机械转场、过密排比、重复总结和夸大结论；尤其检查高频的“不是……而是……”“不只是……更是……”否定对照句。打散过于整齐的句长与段落节奏，保留作者真实的一人称判断、具体细节、犹豫和边界。不能为了口语化添加虚假经历、网络梗或滥用 emoji。把成稿写入 `draft/polished.md` 并记录 `polished` 检查点；各平台完成后统一将具体语气与事实复审写入 `draft/editorial-review.json`。`metadata.ai_tone_review` 仅用于旧项目兼容，不再重复填写两份复审。具体遵守 [editorial-guide.md](references/editorial-guide.md)。
 
+### 3.1. 确定各平台标题、分类话题与英文版
+
+必须阅读 [publishing-plan.md](references/publishing-plan.md)，执行 `publishing-context --project <slug>`，由 AI 根据本博客专业深度和国际读者收益决定英文版取舍。将独立平台标题、规范分类话题、英文决策与理由写入 `draft/publishing-plan.json`。博客标题专业清晰；公众号和小红书标题尽量抓住读者问题与真实收益，禁止夸大。面试类等低复用内容通常不翻译。需要英文版时，配图阶段同步准备英语文字版本。
+
 ### 4. 生成、上传并插入配图
 
 先按 [visual-direction.md](references/visual-direction.md) 为每个图片槽位写 brief，再使用可用的图片生成工具。生成后 AI 必须实际查看图片并记录 review；图片文件存在或比例正确，不代表语义合格。
@@ -139,9 +143,11 @@ python3 <pipeline.py> upload-image \
 
 `cover` 是正文首图，`wechat-cover` 是微信公众号后台封面字段。脚本会校验实际比例、调用插件内部图片上传模块、解析远程 URL 并写入 `metadata.json`。把正文图片的远程 URL 插入博客与微信 Markdown，小红书按每轮材料计划选图；微信封面不插入正文，由发布阶段单独填写。成功后记录 `illustrated` 检查点。
 
+需要英文版时，对全部正文图片执行 [英文图片规则](references/publishing-plan.md#英文图片)，包括后续新增的配图。上传英文图使用 `--language en`，不得覆盖中文图记录。
+
 ### 5. 改写三端内容
 
-- 博客：保留完整论证、代码、引用与目录结构，正文源为 `draft/polished.md`。
+- 博客：保留完整论证、代码、引用与目录结构，正文源为 `draft/polished.md`。采用发布计划中的专业标题与规范分类话题；需要英文时完整翻译为 `draft/english.md`，逐节核对内容和英文图片。
 - 微信：先读 [wechat-layout.md](references/wechat-layout.md)，AI 同时写入 `draft/wechat.md` 和已经排好版的 `draft/wechat.html`。`wechat.md` 以博客正文为唯一内容底稿，默认保留全部观点、事实、章节、代码和图片，允许拆短段落、调整强调和图片位置、极少量平台称呼或自然互动；不得摘要化、重组论证或另写一篇。流水线默认要求其与博客正文相似度至少 90%。`wechat.html` 只做行内样式排版，可用 `scripts/wechat_layout.py` 实现可复用主题；可见文本、数字、代码、图片和链接必须与 `wechat.md` 一致。用 `scripts/wechat_preview.py` 生成 375px、430px 预览，实际查看并修正后记录视觉复审。
 - 小红书：先读 [rednote-planning.md](references/rednote-planning.md)，比较合并与拆分的读者收益。以 `content_units` 映射每篇的原文材料，补齐 `unit_ids`、`split_reason`、`standalone_test`、`overlap_review`，不硬凑或压缩篇数。先提取原文的对象、目标读者、核心判断、可执行信息和真实材料，再判断能支撑几篇无需前文也能读懂的笔记。同一产品介绍所需的动机、做法和结果通常应留在一篇，不能按长文章章节拆轮；只有主题、读者收益和证据材料都能独立成立时才增加轮次。每轮先写 `series-plan.json` 中的完整上下文，再写 `cards.json` 规划 3–9 张卡片，最后生成独立可读的 `post.md`。开头 120 个可见字符内重新点明对象、目标读者与核心观点，禁止“上一轮、下一轮、上文、前文、见前”等依赖。图片优先使用真实截图和材料，单卡只推进一个信息点。
 
@@ -159,6 +165,7 @@ python3 <pipeline.py> inspect --project <english-slug>
 `content-projects/<slug>/` 只是可恢复的工作草稿区，不是最终发布目录。只有 `reviewed` 后执行 `materialize`，才算完成持久化。命令默认生成以下最终文件；实际根目录以工作区配置为准：
 
 - `source/_posts/<slug>.md`
+- `source/_posts/en/<slug>.md`（仅 AI 决策生成英文时）
 - `wechat/<slug>/article.md`
 - `wechat/<slug>/article.html`（适合浏览器打开后复制到公众号编辑器）
 - `rednote/<slug>/roundN/post.md`
