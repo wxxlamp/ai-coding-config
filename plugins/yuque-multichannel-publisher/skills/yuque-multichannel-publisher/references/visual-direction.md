@@ -10,6 +10,7 @@
 - `visual_type`：`real-material`、`process-diagram`、`architecture-diagram`、`comparison-chart`、`editorial-illustration` 或 `narrative-scene`。
 - `must_show`：画面里必须可见的 2–5 个对象、关系或步骤。
 - `avoid`：容易把语义带偏的元素。
+- `placement_reason`：放在相关段落之后或操作附近的理由；不默认每节都有图。
 - `prompt`：实际交给生图模型的完整提示词。
 - `review_status`：AI 看过成图并确认语义相符后才能写 `passed`。
 

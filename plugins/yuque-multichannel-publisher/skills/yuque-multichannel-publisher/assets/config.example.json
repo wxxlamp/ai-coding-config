@@ -16,6 +16,7 @@
   "rednote_account": "",
   "rednote_cdp_host": "",
   "rednote_cdp_port": 9222,
+  "rednote_allow_browser_launch": false,
   "github_owner": "",
   "github_repo": "",
   "github_path": "images",

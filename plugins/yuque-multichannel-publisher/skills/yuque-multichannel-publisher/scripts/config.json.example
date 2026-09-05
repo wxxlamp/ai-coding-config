@@ -13,6 +13,7 @@
   "rednote_account": "",
   "rednote_cdp_host": "",
   "rednote_cdp_port": 9222,
+  "rednote_allow_browser_launch": false,
   "chevereto_api_key": "YOUR_CHEVERETO_API_KEY",
   "chevereto_url": "https://your-chevereto-instance.com",
   "imgur_client_id": "YOUR_IMGUR_CLIENT_ID",

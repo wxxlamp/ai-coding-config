@@ -27,6 +27,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "rednote_account": "",
     "rednote_cdp_host": "",
     "rednote_cdp_port": 9222,
+    "rednote_allow_browser_launch": False,
     "github_path": "images",
     "github_branch": "main",
     "github_cdn": "jsdelivr",

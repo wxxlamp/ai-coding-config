@@ -10,6 +10,7 @@ import html as html_lib
 import json
 import os
 import re
+import socket
 import shutil
 import struct
 import subprocess
@@ -18,6 +19,8 @@ import tempfile
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
+
+from editorial_quality import validate_editorial, validate_series_evidence, without_fences
 
 from workspace import DEFAULT_CONFIG, configured_path, config_path, find_workspace_root, load_config, posts_dir, state_dir
 
@@ -64,7 +67,6 @@ AI_TONE_PATTERNS = {
     "否定对照句": re.compile(r"不是.{0,30}而是|不(?:只是|仅仅|仅).{0,30}(?:更是|而是)"),
     "聊天机器人残留": re.compile(r"作为(?:一个|一名)?AI|希望以上(?:内容|回答)|如果你(?:还有|有)任何问题"),
 }
-VOICE_REFERENCE_FINGERPRINT = "a1098d0f36299efcd5f5101dc5e369b855e10c88f8726b170c5a9047526b756d"
 REDNOTE_CROSS_REFERENCE_RE = re.compile(r"上一轮|下一轮|上[一篇文]|前文|见前文|接着上次")
 SECTION_IMAGE_FIELDS = {"section_claim", "visual_type", "must_show", "avoid", "prompt", "review_status"}
 
@@ -241,6 +243,7 @@ def command_setup(args: argparse.Namespace) -> None:
         "rednote_account",
         "rednote_cdp_host",
         "rednote_cdp_port",
+        "rednote_allow_browser_launch",
     ):
         value = getattr(args, key)
         if value is not None:
@@ -282,6 +285,8 @@ def command_init(args: argparse.Namespace) -> None:
         "section_images": {},
         "rednote_images": {},
         "ai_tone_review": {},
+        "editorial_contract_version": 2,
+        "section_image_policy": "content-driven",
         "created_at": created,
     }
     state = {
@@ -573,7 +578,7 @@ def rednote_round_number(path: Path) -> int | None:
 
 
 def ai_tone_risks(markdown: str) -> list[str]:
-    prose = strip_front_matter(markdown)
+    prose = without_fences(strip_front_matter(markdown))
     return [label for label, pattern in AI_TONE_PATTERNS.items() if pattern.search(prose)]
 
 
@@ -590,7 +595,7 @@ def validate_draft(project: Path, metadata: dict[str, Any]) -> tuple[list[str], 
     for field in ("title", "description"):
         if not str(metadata.get(field, "")).strip():
             errors.append(f"metadata.json 缺少 {field}")
-    if metadata.get("edit_mode") == "polish-expand":
+    if metadata.get("edit_mode") == "polish-expand" and metadata.get("editorial_contract_version") != 2:
         tone_review = metadata.get("ai_tone_review")
         if not isinstance(tone_review, dict) or tone_review.get("status") != "passed":
             errors.append("polish-expand 必须由 AI 完成去 AI 味复审，并记录 ai_tone_review.status=passed")
@@ -621,16 +626,31 @@ def validate_draft(project: Path, metadata: dict[str, Any]) -> tuple[list[str], 
     expected_lead_style = str(metadata.get("lead_image_style") or "ghibli-inspired")
     if metadata.get("cover_image", {}).get("style") != expected_lead_style:
         errors.append(f"正文首图必须记录 style={expected_lead_style}，并由 AI review 实际画面")
-    headings = H1_RE.findall(polished)
+    structural_prose = without_fences(polished)
+    headings = H1_RE.findall(structural_prose)
     if not headings:
         warnings.append("正文没有一级标题，无法验证章节配图")
-    lines = polished.splitlines()
+    lines = structural_prose.splitlines()
     for index, line in enumerate(lines):
         any_heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
         if any_heading and not heading_numbered(len(any_heading.group(1)), any_heading.group(2)):
             errors.append(f"标题“{any_heading.group(2)}”缺少 {len(any_heading.group(1))} 级数字序号")
         match = re.match(r"^#\s+(.+?)\s*$", line)
         if not match:
+            continue
+        if metadata.get("section_image_policy") == "content-driven":
+            section = match.group(1)
+            record = metadata.get("section_images", {}).get(section, {})
+            if not record:
+                continue  # Images explain content; short sections need no decorative filler.
+            end = next((i for i in range(index + 1, len(lines)) if re.match(r"^#\s+", lines[i])), len(lines))
+            body = "\n".join(lines[index + 1:end])
+            if record.get("url") not in [url for _, url in IMAGE_RE.findall(body)]:
+                errors.append(f"章节“{section}”的配图必须出现在所属章节内")
+            if record.get("ratio") != "16:9" or record.get("review_status") != "passed":
+                errors.append(f"章节“{section}”的配图需要 16:9 比例和视觉复审")
+            if SECTION_IMAGE_FIELDS - set(record) or not record.get("placement_reason") or not isinstance(record.get("must_show"), list) or len(record.get("must_show", [])) < 2:
+                errors.append(f"章节“{section}”缺少视觉 brief 或 placement_reason")
             continue
         following = [value.strip() for value in lines[index + 1 :] if value.strip()][:3]
         following_images = [IMAGE_RE.fullmatch(value) for value in following]
@@ -651,6 +671,10 @@ def validate_draft(project: Path, metadata: dict[str, Any]) -> tuple[list[str], 
             errors.append(f"一级标题“{match.group(1)}”的章节图必须经过 AI 视觉复审")
         if not isinstance(section_record.get("must_show"), list) or len(section_record.get("must_show", [])) < 2:
             errors.append(f"一级标题“{match.group(1)}”的 must_show 至少需要两个具体元素或关系")
+    if metadata.get("section_image_policy") == "content-driven":
+        unknown_sections = set(metadata.get("section_images", {})) - set(headings)
+        if unknown_sections:
+            errors.append("章节图记录对应的标题不存在：" + ", ".join(sorted(unknown_sections)))
     if "wechat" in channels:
         wechat_cover = metadata.get("wechat_cover_image", {})
         expected_wechat_ratio = str(metadata.get("wechat_cover_ratio") or "2.35:1")
@@ -697,7 +721,7 @@ def validate_draft(project: Path, metadata: dict[str, Any]) -> tuple[list[str], 
                         f"wechat.html 与 wechat.md 的正文相似度为 {html_similarity:.1%}，排版时不得改写内容"
                     )
     if "rednote" in channels:
-        rounds = sorted((project / "draft" / "rednote").glob("round*/post.md"))
+        rounds = sorted((project / "draft" / "rednote").glob("round*/post.md"), key=lambda p: rednote_round_number(p) or 0)
         config = load_config(find_workspace_root(project))
         minimum_images = int(config.get("rednote_images_min", 3))
         maximum_images = int(config.get("rednote_images_max", 5))
@@ -713,6 +737,8 @@ def validate_draft(project: Path, metadata: dict[str, Any]) -> tuple[list[str], 
             errors.append(f"缺少小红书系列策划：{series_plan}")
         else:
             plan = read_json(series_plan)
+            if metadata.get("editorial_contract_version") == 2:
+                errors.extend(validate_series_evidence(plan, polished))
             planned_rounds = plan.get("rounds") if isinstance(plan, dict) else None
             if not isinstance(planned_rounds, list) or not planned_rounds:
                 errors.append("series-plan.json 至少需要一个由 AI 规划的轮次")
@@ -786,6 +812,10 @@ def validate_draft(project: Path, metadata: dict[str, Any]) -> tuple[list[str], 
                         errors.append(f"{round_path.parent.name}/cards.json 第 {expected_index} 张缺少 {field}")
                 if len(str(card.get("body", "")).strip()) > 80:
                     errors.append(f"{round_path.parent.name}/cards.json 第 {expected_index} 张正文超过 80 个汉字")
+    if metadata.get("editorial_contract_version") == 2:
+        errors.extend(validate_editorial(project, metadata, channels))
+    else:
+        warnings.append("旧项目尚未启用编辑契约 v2；继续加工时按 editorial-review.md 升级")
     return errors, warnings
 
 
@@ -812,7 +842,7 @@ def validate_materialized(repo: Path, slug: str, metadata: dict[str, Any]) -> tu
     for name in required:
         if not outputs[name].is_file():
             errors.append(f"缺少 {name}: {outputs[name]}")
-    rounds = sorted(outputs["rednote_root"].glob("round*/post.md")) if "rednote" in channels else []
+    rounds = sorted(outputs["rednote_root"].glob("round*/post.md"), key=lambda p: rednote_round_number(p) or 0) if "rednote" in channels else []
     if "rednote" in channels:
         if not rounds:
             errors.append(f"小红书最终目录至少需要一个 AI 规划轮次：{outputs['rednote_root']}")
@@ -826,6 +856,31 @@ def validate_materialized(repo: Path, slug: str, metadata: dict[str, Any]) -> tu
                 errors.append(f"小红书最终目录缺少卡片叙事：{round_path.parent / 'cards.json'}")
     if "blog" in channels and outputs["blog"].is_file() and not outputs["blog"].read_text(encoding="utf-8").startswith("---\n"):
         errors.append("博客文章缺少 front matter")
+    if metadata.get("editorial_contract_version") == 2:
+        project = project_dir(repo, slug)
+        draft_errors, draft_warnings = validate_draft(project, metadata)
+        errors.extend(draft_errors)
+        warnings.extend(draft_warnings)
+        pairs = []
+        if "blog" in channels:
+            pairs.append((project/"draft/polished.md", outputs["blog"], True))
+        if "wechat" in channels:
+            pairs += [(project/"draft/wechat.md", outputs["wechat_markdown"], True),
+                      (project/"draft/wechat.html", outputs["wechat_html"], False)]
+        if "rednote" in channels:
+            source = project/"draft/rednote"
+            expected = {p.relative_to(source) for p in source.glob("round*/*") if p.name in {"post.md", "cards.json"}}
+            actual = {p.relative_to(outputs["rednote_root"]) for p in outputs["rednote_root"].glob("round*/*") if p.name in {"post.md", "cards.json"}}
+            if actual != expected:
+                errors.append("小红书最终轮次/卡片与当前已审阅草稿不一致，先归档过时轮次并重新物化")
+            pairs += [(source/name, outputs["rednote_root"]/name, False) for name in expected | {Path("series-plan.json")}]
+        for source, target, frontmatter in pairs:
+            if source.is_file() and target.is_file():
+                left, right = source.read_text(), target.read_text()
+                if frontmatter:
+                    left, right = strip_front_matter(left), strip_front_matter(right)
+                if left.rstrip() != right.rstrip():
+                    errors.append(f"最终产物与已审阅草稿不一致，请重新物化：{target}")
     return errors, warnings
 
 
@@ -1189,6 +1244,15 @@ def run_checked(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess
     return result
 
 
+def is_tcp_port_open(host: str, port: int, timeout: float = 0.5) -> bool:
+    """Return whether an existing browser CDP endpoint is already listening."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def command_send_draft(args: argparse.Namespace) -> None:
     if not args.confirm:
         raise SystemExit("该命令会操作外部平台；确认目标账号后添加 --confirm")
@@ -1304,10 +1368,20 @@ def command_send_draft(args: argparse.Namespace) -> None:
         content_file = Path(temp) / "content.txt"
         title_file.write_text(title + "\n", encoding="utf-8")
         content_file.write_text(body + "\n", encoding="utf-8")
+        host = str(config.get("rednote_cdp_host") or "127.0.0.1").strip()
+        port = int(config.get("rednote_cdp_port") or 9222)
+        local_host = host.lower() in {"127.0.0.1", "localhost", "::1"}
+        allow_browser_launch = bool(config.get("rednote_allow_browser_launch", False))
+        if local_host and not allow_browser_launch and not is_tcp_port_open(host, port):
+            raise SystemExit(
+                "没有发现已开启 CDP 的现有浏览器；为避免静默新开 Chrome，已停止。"
+                "请优先使用 Codex 当前浏览器控制能力，或显式配置 rednote_allow_browser_launch=true。"
+            )
         command = [
             sys.executable,
             str(script),
             "--preview",
+            "--reuse-existing-tab",
             "--title-file",
             str(title_file),
             "--content-file",
@@ -1317,9 +1391,7 @@ def command_send_draft(args: argparse.Namespace) -> None:
             command.extend(["--image-urls", *images])
         if account:
             command.extend(["--account", account])
-        host = str(config.get("rednote_cdp_host") or "").strip()
-        if host:
-            command.extend(["--host", host, "--port", str(config.get("rednote_cdp_port") or 9222)])
+        command.extend(["--host", host, "--port", str(port)])
         run_checked(command, cwd=script.parents[1])
     record_delivery(
         project,
@@ -1393,7 +1465,7 @@ def command_materialize(args: argparse.Namespace) -> None:
         outputs["wechat_markdown"].write_text(wechat_source.rstrip() + "\n", encoding="utf-8")
         outputs["wechat_html"].write_text(wechat_html.rstrip() + "\n", encoding="utf-8")
     if "rednote" in channels:
-        source_rounds = sorted((project / "draft" / "rednote").glob("round*/post.md"))
+        source_rounds = sorted((project / "draft" / "rednote").glob("round*/post.md"), key=lambda p: rednote_round_number(p) or 0)
         for source in source_rounds:
             destination_dir = outputs["rednote_root"] / source.parent.name
             destination_dir.mkdir(parents=True, exist_ok=True)
@@ -1447,6 +1519,12 @@ def build_parser() -> argparse.ArgumentParser:
     setup.add_argument("--rednote-account")
     setup.add_argument("--rednote-cdp-host")
     setup.add_argument("--rednote-cdp-port", type=int)
+    setup.add_argument(
+        "--rednote-allow-browser-launch",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="允许小红书 CLI 在找不到现有 CDP 浏览器时新开 Chrome（默认禁止）",
+    )
     setup.set_defaults(handler=command_setup)
 
     init = subparsers.add_parser("init", help="创建内容项目")
