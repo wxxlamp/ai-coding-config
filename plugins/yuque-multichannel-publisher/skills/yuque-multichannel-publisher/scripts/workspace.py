@@ -12,6 +12,7 @@ PLUGIN_STATE_NAME = "yuque-multichannel-publisher"
 DEFAULT_CONFIG: dict[str, Any] = {
     "posts_dir": "source/_posts",
     "taxonomy_catalog": "source/_data/taxonomy.json",
+    "reference_catalog": "source/_data/references.json",
     "content_projects_dir": "content-projects",
     "wechat_dir": "wechat",
     "rednote_dir": "rednote",

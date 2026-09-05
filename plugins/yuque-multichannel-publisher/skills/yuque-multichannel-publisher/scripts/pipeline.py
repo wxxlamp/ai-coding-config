@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from editorial_quality import validate_editorial, validate_series_evidence, without_fences
+from reference_links import reference_context
 from publishing_policy import catalog_context, load_plan, title_for, english_enabled, validate_plan
 
 from workspace import DEFAULT_CONFIG, configured_path, config_path, find_workspace_root, load_config, posts_dir, state_dir
@@ -288,6 +289,7 @@ def command_init(args: argparse.Namespace) -> None:
         "ai_tone_review": {},
         "editorial_contract_version": 2,
         "publishing_contract_version": 1,
+        "reference_contract_version": 1,
         "section_image_policy": "content-driven",
         "created_at": created,
     }
@@ -1534,6 +1536,7 @@ def command_publishing_context(args: argparse.Namespace) -> None:
     source = project / "draft/polished.md"
     result["source_sha256"] = file_digest(source) if source.is_file() else None
     result["plan_path"] = str(project / "draft/publishing-plan.json")
+    result["references"] = reference_context(repo, args.project)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from markdown_it import MarkdownIt
 from editorial_quality import digest, load_object, without_fences
 from workspace import load_config, configured_path, posts_dir
+from reference_links import reference_context, validate_reference_language, translation_reference_errors
 
 
 def load_plan(project):
@@ -94,6 +95,14 @@ def validate_plan(project, metadata, repo):
             if not isinstance(item, dict) or not item.get('reason') or not match or item.get('text') != match[1]:
                 errors.append(f'{path.parent.name} 缺少与实际笔记一致的独立标题及选择理由')
     if 'blog' not in channels: return errors
+    citations = reference_context(repo, metadata.get("project") or project.name)
+    if metadata.get('reference_contract_version') == 1:
+        if plan.get('references_sha256') != citations['sha256']:
+            errors.append('引用目录已变化或未读取；重新执行 publishing-context 并复审引用')
+        review = plan.get('references_review', {})
+        if not isinstance(review, dict): review = {}
+        if not review.get('zh'): errors.append('缺少中文引用语言与来源的实际复审说明')
+        errors.extend(validate_reference_language(polished.read_text() if polished.is_file() else '', 'zh', citations))
     taxonomy = plan.get('taxonomy', {})
     if not isinstance(taxonomy, dict): taxonomy = {}
     try: context = catalog_context(repo)
@@ -122,7 +131,10 @@ def validate_plan(project, metadata, repo):
     a, b = body_structure(source), body_structure(text)
     if a[0] != b[0]: errors.append('英文版代码块与中文原稿不一致')
     if a[1] != b[1]: errors.append('英文版章节层级或顺序不完整')
-    if not set(a[3]) <= set(b[3]): errors.append('英文版遗漏原文引用链接')
+    errors.extend(translation_reference_errors(source, text, citations, plan))
+    if metadata.get('reference_contract_version') == 1:
+        if not review.get('en'): errors.append('缺少英文引用语言、来源等价性与锚点的实际复审说明')
+        errors.extend(validate_reference_language(text, 'en', citations))
     prose = re.sub(r'`[^`]*`|https?://\S+', '', without_fences(text))
     if len(re.findall(r'[\u4e00-\u9fff]', prose)) > 40: errors.append('英文版仍有未翻译的中文正文或图注')
     if len(prose) < len(without_fences(source)) * .75: errors.append('英文版疑似遗漏正文；应完整翻译而非摘要')

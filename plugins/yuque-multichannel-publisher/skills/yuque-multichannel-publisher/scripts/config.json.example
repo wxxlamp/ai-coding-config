@@ -24,5 +24,6 @@
   "github_path": "images",
   "github_branch": "main",
   "github_cdn": "jsdelivr",
-  "taxonomy_catalog": "source/_data/taxonomy.json"
+  "taxonomy_catalog": "source/_data/taxonomy.json",
+  "reference_catalog": "source/_data/references.json"
 }

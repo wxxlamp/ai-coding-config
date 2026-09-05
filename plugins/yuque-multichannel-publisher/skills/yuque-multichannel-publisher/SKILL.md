@@ -118,7 +118,7 @@ python3 plugins/yuque-multichannel-publisher/skills/yuque-multichannel-publisher
 
 ### 3.1. 确定各平台标题、分类话题与英文版
 
-必须阅读 [publishing-plan.md](references/publishing-plan.md)，执行 `publishing-context --project <slug>`，由 AI 根据本博客专业深度和国际读者收益决定英文版取舍。将独立平台标题、规范分类话题、英文决策与理由写入 `draft/publishing-plan.json`。博客标题专业清晰；公众号和小红书标题尽量抓住读者问题与真实收益，禁止夸大。面试类等低复用内容通常不翻译。需要英文版时，配图阶段同步准备英语文字版本。
+必须阅读 [publishing-plan.md](references/publishing-plan.md)，执行 `publishing-context --project <slug>`，由 AI 根据本博客专业深度和国际读者收益决定英文版取舍。正文引用必须遵守中文引中文、英文引英文的规则；按发布计划的引用契约检查真实译文路由、外部同源译版与章节锚点，并填写 references_sha256 / references_review。将独立平台标题、规范分类话题、英文决策与理由写入 `draft/publishing-plan.json`。博客标题专业清晰；公众号和小红书标题尽量抓住读者问题与真实收益，禁止夸大。面试类等低复用内容通常不翻译。需要英文版时，配图阶段同步准备英语文字版本。
 
 ### 4. 生成、上传并插入配图
 

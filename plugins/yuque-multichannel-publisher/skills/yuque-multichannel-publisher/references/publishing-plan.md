@@ -81,3 +81,37 @@
 仅填写已选平台的标题。若跳过英文，使用 `"english": {"decision": "skip", "reason": "<与具体内容有关的理由>"}`；不要遗留 english.md。只选社交平台时无需 taxonomy / english 字段。示例标题、理由和图片均为格式说明，必须针对真实文章重新判断。
 
 复审 artifacts 必须含 `draft/publishing-plan.json`；生成英文时还需 `draft/english.md`。使用 SHA-256 对文件原始字节求值，不能自己编造指纹。`materialize` 写出 `source/_posts/<slug>.md` 与可选 `source/_posts/en/<slug>.md`；英文 front matter 使用 `lang: en`、`translation_of: <slug>`，并与中文共享日期、分类和话题。旧英文稿存在且当前决策为跳过时会停止，要求明确处理，避免静默删除或误发布。
+
+
+## 引用语言与来源（reference contract v1）
+
+新项目自动记录 `metadata.reference_contract_version: 1`。`publishing-context` 同时返回 `references`，包含真实存在的站内双语路由、已核验的外部同源中英文对照和 `sha256`。把该值写入发布计划 `references_sha256`，分别填写 `references_review.zh` / `references_review.en` 的实际检查说明（不生成英文时只需 zh）。复审仍绑定整个计划与成稿，引用改动后重新审阅。
+
+1. 中文稿引用中文页面，英文稿引用英文页面。站内链接根据文章日期、slug、lang 和 translation_of 匹配真实存在的译文；保留查询参数、章节锚点。兼容绝对 URL、相对站点路径、旧域名、Markdown 引用式链接、HTML 链接和裸 URL，代码及图片地址不当作文章引用改写。
+2. 不得机械添加 `/en/`，也不能把整篇文章链接当作某个不同内容的来源。目标不存在就修复旧地址或补译被引用文章；尚不补译时，保留原始出处并明确标注 `in Chinese` / `英文原文`，说明原因。用户要求引用全部同语言时，补齐站内被引用文章后再完成。
+3. 外部资料优先选择同一官方文档的对应语言版本，实际打开确认内容和锚点。不存在同语言版本的论文、原始采访、博客文章和课程，不用不相关的英语资料冒充翻译；保留原始出处并标明语言。代码仓库、产品入口和其他语言中立的资源可共用。
+4. 工作区 `source/_data/references.json`（配置键 `reference_catalog`）可记录 `site_aliases`、`route_aliases`、`pairs: [{"zh": "...", "en": "..."}]` 与 `original_sources: [{"url": "...", "language": "zh"}]`。只登记已经检查过的对应关系，不根据网址模式猜测。
+5. 新的外部同源译文尚未收录目录时，在计划 `reference_links` 中填写 `source_url`、英文 `url`、`review_status: passed` 和具体 `review_note`。脚本接受经过记录的对应译文，不再要求中英稿引用 URL 完全一样；已知站内路由不能被手工映射覆盖。脚本只能验证结构与审阅记录，远程语言和内容等价性必须由 AI 实际检查。
+6. 跨段或全文的同语言对应关系不能只检查“Read in English”按钮，还要逐一检查正文、引用块、参考资料和裸链接。本站英文标题锚点复用中文文章锚点，保留片段并在生成页面中确认存在。自引用优先使用 `#section`。
+
+计划补充示例：
+
+```json
+{
+  "references_sha256": "<publishing-context.references.sha256>",
+  "references_review": {
+    "zh": "正文中的站内引用均指向中文原稿；官方文档切换为已核对的中文版。",
+    "en": "站内引用均有对应英文文件；外部文档核对了主题、版本与章节锚点。"
+  },
+  "reference_links": [
+    {
+      "source_url": "https://docs.example/zh/topic",
+      "url": "https://docs.example/en/topic",
+      "review_status": "passed",
+      "review_note": "实际阅读同一官方文档的两个语言版本，论据与所引章节一致。"
+    }
+  ]
+}
+```
+
+旧项目不自动修改正文或状态；需要启用此项时添加 metadata.reference_contract_version: 1，重新获取目录指纹并补齐复审。新增被引用译文后重新执行 publishing-context，避免沿用“只有中文”的旧判断。
